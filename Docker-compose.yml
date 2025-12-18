@@ -10,6 +10,7 @@ services:
   # 1. The Logic Layer (Django) - WRITES
   # ==========================================
   medilink:
+    command: python manage.py runserver 0.0.0.0:8000 # <--- CRITICAL: Must be runserver
     container_name: medilink
     build:
       context: .
@@ -66,7 +67,7 @@ services:
     networks:
       - medilink-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U medilink_user"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_NAME}"]
       interval: 5s
       timeout: 5s
       retries: 5

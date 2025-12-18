@@ -1,0 +1,16 @@
+[project]
+name = "medilink"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "celery",
+    "django",
+    "django-ninja",
+    "django-redis>=6.0.0",
+    "gunicorn",
+    "psycopg[binary]",
+    "redis",
+    "uvicorn[standard]",
+]

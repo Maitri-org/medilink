@@ -1,0 +1,173 @@
+#=============================================
+# Docker-Compose Configuration for Medilink
+# This file orchestrates the multi-container setup
+# for the Medilink application, including the logic,
+# data, speed, and notification layers.
+# author: Kulkarni vedant Manoj
+#=============================================
+services:
+  # ==========================================
+  # 1. The Logic Layer (Django) - WRITES
+  # ==========================================
+  medilink:
+    container_name: medilink
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8000"
+    environment:
+      - ENV=dev
+      # Connects to the Single Source of Truth
+      - DB_HOST=medilink-db
+      - DB_PORT=${DB_PORT}
+      - DB_NAME=${DB_NAME}
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      # Offline Reliable Email
+      - EMAIL_HOST=medilink-email
+      - EMAIL_PORT=1025
+      # Redis Caching
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}/1
+
+    volumes:
+      - .:/Medilink
+      - /Medilink/.venv
+    restart: on-failure:5 # Retry 5 times if it crashes, then stop
+    networks:
+      - medilink-network
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/admin/login/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==========================================
+  # 2. The Data Layer (Postgres) - SOURCE OF TRUTH
+  # ==========================================
+  db:
+    container_name: medilink-db
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=${DB_USERNAME}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
+    volumes:
+      # Robust Data Storage
+      - pgdata:/var/lib/postgresql/data
+      # Isolated Activity Logs (Reliability Feature)
+      - logData:/var/lib/postgresql/tablespaces/activity_logs
+    restart: unless-stopped
+    networks:
+      - medilink-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medilink_user"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    
+  
+  # ==========================================
+  # 3. The Speed Layer (PostgREST) - READS
+  # ==========================================
+  # This is your "Backup Generator." If Django dies, this still serves data.
+  api_fast: 
+    container_name: medilink-api-fast
+    image: postgrest/postgrest
+    ports:
+      - "3000:3000"
+    environment:
+      - PGRST_DB_URI=postgres://${DB_USERNAME}:${DB_PASSWORD}@medilink-db:${DB_PORT}/${DB_NAME}
+      - PGRST_DB_SCHEMA=public
+      - PGRST_DB_ANON_ROLE=${DB_USERNAME}
+      # Reliability: Limit rows so a huge request doesn't crash the DB
+      - PGRST_MAX_ROWS=1000 
+    restart: unless-stopped
+    networks:
+      - medilink-network
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ==========================================
+  # 4. The Speed Layer (Redis) - Caching
+  # ==========================================
+  redis:
+    container_name: medilink-redis
+    image: redis:alpine
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      - medilink-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # 5. The Notification Layer (Mailpit)
+  # ==========================================
+  mailpit:
+    container_name: medilink-email
+    image: axllent/mailpit
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+    restart: unless-stopped
+    networks:
+      - medilink-network
+
+  # ==========================================
+  # 6. Admin Tools (pgAdmin & RedisInsight)
+  # ==========================================    
+  pgadmin:
+    container_name: medilink-pgadmin
+    image: dpage/pgadmin4
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_EMAIL}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_PASSWORD}
+    ports:
+      - "5050:80"
+    restart: unless-stopped
+    networks:
+      - medilink-network
+    depends_on:
+      db:
+        condition: service_healthy
+
+  #=========================================
+  # Redis Insight for Monitoring Redis
+  #=========================================
+  redis-insight:
+    container_name: medilink-redis-insight
+    image: redis/redisinsight:latest
+    ports:
+      - "5540:5540"
+    volumes:
+      - redisinsight_data:/data
+    restart: unless-stopped
+    networks:
+      - medilink-network
+    depends_on:
+      redis:
+        condition: service_started
+
+# ==========================================
+# Network & Volume Definitions
+# ==========================================
+networks:
+  medilink-network:
+    driver: bridge
+
+volumes:
+  pgdata:
+  logData:
+  redisinsight_data:

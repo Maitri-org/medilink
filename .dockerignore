@@ -1,0 +1,17 @@
+# Ignore git history (Huge size reduction)
+.git
+.gitignore
+
+# Ignore local virtual environments (We build fresh ones)
+.venv
+venv
+env
+
+# Ignore python cache (Avoids conflicts)
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore OS files
+.DS_Store

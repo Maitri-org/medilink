@@ -1,0 +1,23 @@
+# Python & Django
+__pycache__/
+*.py[cod]
+db.sqlite3
+/media
+/static
+
+# Environment & Secrets (NEVER UPLOAD THESE)
+.env
+.env.*
+
+# Docker & Virtual Environments
+.venv/
+venv/
+ENV/
+
+# IDE Settings (Optional)
+.vscode/
+.idea/
+
+# OS Junk
+.DS_Store
+Thumbs.db

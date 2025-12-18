@@ -125,7 +125,7 @@ That's it! No Python, PostgreSQL, Redis, or any other dependencies needed on you
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/yourusername/medilink.git
+git clone [https://github.com/Maitri-org/medilink.git]
 cd medilink
 
 # 2. Start the entire infrastructure
